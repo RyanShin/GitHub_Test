@@ -32,3 +32,4 @@
 *.dSYM/
 *.su
 output/
+__pycache__/
