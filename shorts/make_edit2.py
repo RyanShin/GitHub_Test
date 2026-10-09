@@ -58,37 +58,58 @@ def B(n):
     return 9.68 + 0.6 * n
 
 
-def shot(src, t0, t1, c0, c1=None, grade="punch", fx=(), vt=0.0, spd=1.0):
+# where the subject is in each clip: (clip seconds, cx, cy) as frame fractions
+TRACK = {
+    "V_beach": [(0, .57, .58), (1, .53, .58), (2, .57, .58), (3, .62, .58), (4, .58, .58),
+                (5, .53, .58), (6, .47, .58), (7, .5, .58), (8, .6, .58), (9, .62, .58),
+                (10, .6, .58), (11, .6, .58), (12, .62, .58), (12.9, .65, .58)],
+    "V_boat": [(0, .55, .45), (.5, .52, .42), (1, .58, .4), (1.5, .66, .36), (2, .68, .38),
+               (2.5, .55, .4), (5, .38, .5), (5.5, .4, .45), (6, .4, .5), (6.5, .32, .55),
+               (7, .28, .55), (7.5, .3, .5), (8, .48, .5), (8.5, .5, .5), (9, .6, .5), (9.5, .62, .45)],
+    "V_bridge": [(0, .3, .4), (1, .3, .4), (2, .27, .4), (3, .22, .45), (4, .25, .5), (4.5, .2, .5),
+                 (13, .18, .45), (13.5, .33, .45), (14, .42, .45), (14.5, .55, .45), (15, .7, .45),
+                 (15.5, .7, .45), (16, .4, .45), (16.5, .37, .45), (23.5, .37, .45), (24, .18, .45)],
+}
+
+
+def tracked(clip, t):
+    k = TRACK[clip]
+    ts = [p[0] for p in k]
+    return float(np.interp(t, ts, [p[1] for p in k])), float(np.interp(t, ts, [p[2] for p in k]))
+
+
+def shot(src, t0, t1, c0, c1=None, grade="punch", fx=(), vt=0.0, spd=1.0, track=False):
     c0 = tuple(c0) + (0,) * (4 - len(c0))
     c1 = tuple(c1 or c0) + (0,) * (4 - len(c1 or c0))
-    return dict(src=src, t0=t0, t1=t1, c0=c0, c1=c1, grade=grade, fx=set(fx), vt=vt, spd=spd)
+    return dict(src=src, t0=t0, t1=t1, c0=c0, c1=c1, grade=grade, fx=set(fx), vt=vt, spd=spd,
+                track=track)
+
+
+def vshot(clip, t0, t1, vt, z0, z1, grade="punch", fx=()):
+    """Video segment whose crop follows the subject (see TRACK)."""
+    return shot(clip, t0, t1, (0, 0, z0), (0, 0, z1), grade, fx, vt=vt, track=True)
 
 
 def build_timeline():
     S = []
     # --- story -----------------------------------------------------------
     S.append(shot("drone", 0.0, 2.3, (0.38, 0.5, 1.0), (0.36, 0.52, 1.25), "warm", ["fadein"]))
-    S.append(shot("V_bridge", 2.3, 4.6, (0.5, 0.5, 1.0), (0.5, 0.5, 1.08), "warm", ["leak"], vt=6.2))
-    S.append(shot("POLA", 4.6, 7.25, (0.5, 0.5, 1.0), (0.5, 0.5, 1.75), "warm", ["leak", "zoomout"]))
-    S.append(shot("boy_bridge", 7.25, B(0), (0.43, 0.5, 1.05), (0.43, 0.45, 1.25), "punch",
-                  ["zoomin", "bloom"]))
+    S.append(shot("V_bridge", 2.3, 4.6, (0.5, 0.5, 1.0), (0.5, 0.5, 1.08), "warm", ["leak"], vt=9.0))
+    S.append(vshot("V_beach", 4.6, 6.2, 4.0, 1.25, 1.4, "warm", ["leak"]))
+    S.append(shot("POLA", 6.2, 7.25, (0.5, 0.5, 1.0), (0.5, 0.5, 1.75), "warm", ["leak", "zoomout"]))
+    S.append(vshot("V_bridge", 7.25, B(0), 17.0, 1.0, 1.2, "punch", ["zoomin", "bloom"]))
     # --- beat section 1 ----------------------------------------------------
-    beats = [
-        (0, 1, "boy_arms", (0.37, 0.55, 1.15), (0.37, 0.55, 1.25), ["punch", "flash", "stars"], 0),
-        (1, 2, "V_boat", (0.58, 0.5, 1.0), (0.6, 0.5, 1.08), ["shake", "rgb"], 0.3),
-        (2, 4, "V_beach", (0.56, 0.5, 1.2), (0.6, 0.5, 1.3), ["whip"], 2.0),
-        (4, 6, "snorkel", (0.55, 0.3, 1.2), (0.55, 0.3, 1.4), ["zoomin", "bloom"], 0),
-        (6, 7, "shop", (0.62, 0.55, 1.4), (0.62, 0.55, 1.5), ["punch", "rgb"], 0),
-        (7, 8, "seafan", (0.62, 0.55, 1.1), (0.62, 0.55, 1.2), ["wipe", "stars"], 0),
-        (8, 9, "V_bridge", (0.3, 0.45, 1.15), (0.3, 0.45, 1.25), ["bw", "flash"], 0.4),
-        (9, 10, "mom_walk", (0.44, 0.45, 1.5), (0.44, 0.45, 1.6), ["punch"], 0),
-        (10, 11, "food", (0.42, 0.5, 1.4), (0.42, 0.5, 1.55), ["shake"], 0),
-        (11, 12, "coral_fish", (0.5, 0.45, 1.0), (0.5, 0.45, 1.1), ["whip", "bloom"], 0),
-        (12, 13, "boy_bridge", (0.43, 0.38, 1.8), (0.43, 0.38, 1.95), ["punch", "rgb"], 0),
-        (13, 14, "V_boat", (0.37, 0.45, 1.0), (0.5, 0.45, 1.05), ["wipe", "punch"], 7.6),
-    ]
-    for a, b, src, c0, c1, fx, vt in beats:
-        S.append(shot(src, B(a), B(b), c0, c1, "punch", fx, vt=vt))
+    S.append(shot("boy_arms", B(0), B(1), (0.37, 0.55, 1.15), (0.37, 0.55, 1.25), "punch",
+                  ["punch", "flash", "stars"]))
+    S.append(vshot("V_boat", B(1), B(3), 0.0, 1.0, 1.1, "punch", ["shake", "rgb"]))
+    S.append(shot("snorkel", B(3), B(4), (0.55, 0.3, 1.2), (0.55, 0.3, 1.4), "punch", ["zoomin", "bloom"]))
+    S.append(vshot("V_beach", B(4), B(6), 7.0, 1.4, 1.55, "punch", ["whip"]))
+    S.append(shot("shop", B(6), B(7), (0.62, 0.55, 1.4), (0.62, 0.55, 1.5), "punch", ["punch", "rgb"]))
+    S.append(shot("seafan", B(7), B(8), (0.62, 0.55, 1.1), (0.62, 0.55, 1.2), "punch", ["wipe", "stars"]))
+    S.append(vshot("V_bridge", B(8), B(10), 0.5, 1.1, 1.2, "punch", ["flash", "bloom"]))
+    S.append(shot("food", B(10), B(11), (0.42, 0.5, 1.4), (0.42, 0.5, 1.55), "punch", ["shake"]))
+    S.append(shot("coral_fish", B(11), B(12), (0.5, 0.45, 1.0), (0.5, 0.45, 1.1), "punch", ["whip", "bloom"]))
+    S.append(vshot("V_boat", B(12), B(14), 6.0, 1.0, 1.05, "punch", ["wipe", "punch"]))
     rapid = [("restaurant", (0.6, 0.25, 2.0)), ("coral1", (0.5, 0.5, 1.2)),
              ("bridge_wide", (0.18, 0.4, 1.3)), ("coral_purple", (0.55, 0.5, 1.2)),
              ("selfie", (0.66, 0.5, 1.6))]
@@ -97,23 +118,18 @@ def build_timeline():
         S.append(shot(src, a, b, c, (c[0], c[1], c[2] * 1.06), "punch", ["flash", "punch"]))
     # --- dialogue ----------------------------------------------------------
     S.append(shot("mom_sea", 19.25, 20.30, (0.38, 0.5, 1.5), (0.38, 0.5, 1.65), "dark", ["flash"]))
-    S.append(shot("V_bridge", 20.30, 20.90, (0.36, 0.42, 1.35), (0.36, 0.42, 1.45), "punch",
-                  ["bloom"], vt=20.0))
-    S.append(shot("V_beach", 20.90, 22.0, (0.55, 0.5, 1.15), (0.55, 0.5, 1.25), "dark", [], vt=6.0))
+    S.append(vshot("V_bridge", 20.30, 20.90, 20.0, 1.3, 1.4, "punch", ["bloom"]))
+    S.append(vshot("V_beach", 20.90, 22.0, 9.0, 1.3, 1.4, "dark"))
     S.append(shot("mom_bridge", 22.0, 23.27, (0.42, 0.5, 1.05), (0.42, 0.45, 1.2), "punch",
                   ["xfade", "bloom"]))
     S.append(shot("drone", 23.27, B(24), (0.36, 0.5, 1.3), (0.36, 0.5, 1.45), "punch", ["flash"]))
     # --- beat section 2 ----------------------------------------------------
-    beats2 = [
-        ("V_bridge", (0.36, 0.45, 1.25), (0.36, 0.45, 1.35), ["punch", "flash"], 17.3),
-        ("drone", (0.45, 0.5, 1.0), (0.3, 0.5, 1.0), ["whip"], 0),
-        ("V_beach", (0.55, 0.5, 1.2), (0.55, 0.5, 1.3), ["shake"], 8.3),
-        ("mom_bridge", (0.42, 0.5, 1.0), (0.42, 0.5, 1.1), ["wipe", "stars"], 0),
-        ("boy_arms", (0.36, 0.5, 1.0), (0.36, 0.5, 1.08), ["bloom", "flash"], 0),
-        ("V_boat", (0.5, 0.5, 1.05), (0.5, 0.5, 1.1), ["rgb", "punch"], 4.6),
-    ]
-    for i, (src, c0, c1, fx, vt) in enumerate(beats2):
-        S.append(shot(src, B(24 + i), B(25 + i), c0, c1, "punch", fx, vt=vt))
+    S.append(vshot("V_bridge", B(24), B(25), 21.5, 1.25, 1.35, "punch", ["punch", "flash"]))
+    S.append(shot("drone", B(25), B(26), (0.45, 0.5, 1.0), (0.3, 0.5, 1.0), "punch", ["whip"]))
+    S.append(vshot("V_beach", B(26), B(27), 11.0, 1.35, 1.45, "punch", ["shake"]))
+    S.append(shot("mom_bridge", B(27), B(28), (0.42, 0.5, 1.0), (0.42, 0.5, 1.1), "punch", ["wipe", "stars"]))
+    S.append(shot("boy_arms", B(28), B(29), (0.36, 0.5, 1.0), (0.36, 0.5, 1.08), "punch", ["bloom", "flash"]))
+    S.append(vshot("V_boat", B(29), B(30), 8.0, 1.0, 1.05, "punch", ["rgb", "punch"]))
     rapid2 = [("boy_bridge", (0.43, 0.38, 1.9)), ("mom_walk", (0.44, 0.42, 1.8)),
               ("snorkel", (0.55, 0.25, 1.6)), ("shop", (0.62, 0.55, 1.7)),
               ("mom_sea", (0.38, 0.52, 1.7)), ("seafan", (0.6, 0.5, 1.4)),
@@ -191,8 +207,9 @@ def init(media, times, frames):
     for k, f in MEDIA.items():
         if not k.startswith("V_"):
             SRC[k] = load_photo(os.path.join(media, f))
-    SRC["POLA"], pc = make_polaroid(SRC["boy_bridge"], POLA_CAPTION)
     VID.update(frames)
+    still = source({"src": "V_bridge", "vt": 17.0, "spd": 1.0}, 0.0)
+    SRC["POLA"], pc = make_polaroid(still, POLA_CAPTION)
     TL = build_timeline()
     for s in TL:
         if s["src"] == "POLA":
@@ -218,6 +235,8 @@ def render_shot(s, T, frame_no):
     fx = s["fx"]
     u = lt / d if "whip" in fx else ease(lt / d)
     c = [a + (b - a) * u for a, b in zip(s["c0"], s["c1"])]
+    if s["track"]:
+        c[0], c[1] = tracked(s["src"], s["vt"] + lt * s["spd"])
     if "punch" in fx:
         c[2] *= 1 + 0.18 * (1 - ease_out(lt / 0.3))
     if "shake" in fx:
